@@ -12,7 +12,7 @@ services:
 
   auth_service:
     build:
-      context: ../../../AuthService/AuthService/AuthService # Sørg for, at hele projektet er inkluderet
+      context: ../../AuthService/AuthService # Sørg for, at hele projektet er inkluderet
       dockerfile: Dockerfile
     ports:
       - "5162:8080"
@@ -40,6 +40,7 @@ services:
         "ui": true}
         "api_addr": "https://vault_dev:8201"}
       VAULT_DEV_ROOT_TOKEN_ID: '00000000-0000-0000-0000-000000000000'
+      VAULT_TOKEN: '00000000-0000-0000-0000-000000000000'
     cap_add:
       - IPC_LOCK
     volumes:
@@ -49,6 +50,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    command: 'server -dev -dev-root-token-id="00000000-0000-0000-0000-00000000"'
     networks:
       - shared-network
   

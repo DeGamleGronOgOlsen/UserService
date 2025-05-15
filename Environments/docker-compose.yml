@@ -31,7 +31,7 @@ services:
     ports:
       - "8201:8201"
     environment:
-      VAULT_ADDR: 'https://0.0.0.0:8201'
+      VAULT_ADDR: "https://0.0.0.0:8201"
       VAULT_LOCAL_CONFIG: >
         {"listener": [{"tcp":{"address": "0.0.0.0:8201",
         "tls_disable": "0", "tls_cert_file":"/data/cert.pem",
@@ -39,8 +39,8 @@ services:
         "default_lease_ttl": "168h", "max_lease_ttl": "720h",
         "ui": true}
         "api_addr": "https://vault_dev:8201"}
-      VAULT_DEV_ROOT_TOKEN_ID: '00000000-0000-0000-0000-000000000000'
-      VAULT_TOKEN: '00000000-0000-0000-0000-000000000000'
+      VAULT_DEV_ROOT_TOKEN_ID: "00000000-0000-0000-0000-000000000000"
+      VAULT_TOKEN: "00000000-0000-0000-0000-000000000000"
     cap_add:
       - IPC_LOCK
     volumes:
@@ -53,7 +53,19 @@ services:
     command: 'server -dev -dev-root-token-id="00000000-0000-0000-0000-00000000"'
     networks:
       - shared-network
-  
+
+  vault-init:
+    image: hashicorp/vault:latest
+    command: sh "/app/vault_init.sh"
+    depends_on:
+      - vault_dev
+    healthcheck:
+      retries: 5
+    volumes:
+      - ./vault-init/vault_init.sh:/app/vault_init.sh
+    networks:
+      - shared-network
+
   mongodb:
     image: mongo:latest
     environment:
@@ -64,14 +76,14 @@ services:
     volumes:
       - mongodb_data:/data/db
     networks:
-      - shared-network 
-  
+      - shared-network
+
 volumes:
-  mongodb_data: 
-  vault-volume: 
-  
+  mongodb_data:
+  vault-volume:
+  external: false
+
 networks:
   shared-network:
     external: false
-    driver: bridge  
-
+    driver: bridge

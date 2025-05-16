@@ -42,6 +42,7 @@ public class UserController : ControllerBase
     }
 
     // GET: /User/GetAllUsers
+    [Authorize(Roles = "admin")]
     [HttpGet("GetAllUsers")]
     public async Task<ActionResult<IEnumerable<User>>> GetAll()
     {
@@ -51,7 +52,7 @@ public class UserController : ControllerBase
     }
 
     // POST: /User/AddUser
-    [Authorize(Roles = "admin")]
+    
     [HttpPost("AddUser")]
     public async Task<IActionResult> AddUser([FromBody] User newUser)
     {

@@ -10,6 +10,7 @@ services:
       Vault__Address: "https://vaulthost:8201"
     depends_on:
     - vault-init
+    - vaulthost
     networks:
       - shared-network
 

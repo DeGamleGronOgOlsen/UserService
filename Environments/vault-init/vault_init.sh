@@ -6,6 +6,7 @@ sleep 10
 
 # Insert secrets
 vault kv put -mount secret Connections jwtSecret=hsduehjrebxbbjklwxp39948788akkkkedlpahheb156512989736363yggs jwtIssuer=AuthService
+vault kv put -mount secret Secrets Secret=hsduehjrebxbbjklwxp39948788akkkkedlpahheb156512989736363yggs Issuer=AuthService
 
 # Loop forever to prevent container from terminating
 

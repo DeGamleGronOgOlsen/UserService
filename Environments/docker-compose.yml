@@ -11,6 +11,8 @@ services:
     depends_on:
     - vault-init
     - vaulthost
+    healthcheck:
+      retries: 5
     networks:
       - shared-network
 

@@ -45,6 +45,10 @@ try
     logger.LogInformation("Henter hemmeligheder fra Vault...");
     Secret<SecretData> secretData = await vaultClient.V1.Secrets.KeyValue.V2.ReadSecretAsync(path:"Secrets", mountPoint: "secret");
 
+    logger.LogInformation("Henter MongoDB connection string fra Vault...");
+    Secret<SecretData> connectionSecrets = await vaultClient.V1.Secrets.KeyValue.V2.ReadSecretAsync(
+    path: "Connections", mountPoint: "secret");
+
     string mySecretKey = secretData.Data.Data["Secret"]?.ToString();
     if (string.IsNullOrEmpty(mySecretKey))
     {
@@ -59,6 +63,14 @@ try
         throw new ArgumentNullException(nameof(myIssuer), "Issuer er ikke defineret i Vault.");
     }
 
+    string mongoConnectionString = connectionSecrets.Data.Data["mongoConnectionString"]?.ToString();
+    if (string.IsNullOrEmpty(mongoConnectionString))
+    {
+    logger.LogError("MongoConnectionString er ikke defineret i Vault.");
+    throw new ArgumentNullException(nameof(mongoConnectionString), "MongoConnectionString er ikke defineret i Vault.");
+    }
+
+    builder.Configuration["mongoConnectionString"] = mongoConnectionString;
     builder.Configuration["Secret"] = mySecretKey;
     builder.Configuration["Issuer"] = myIssuer;
 
@@ -115,7 +127,13 @@ builder.Services.AddScoped<IUserDBRepository, UserMongoDBService>();
 builder.Services.AddSingleton<IMongoClient>(sp =>
 {
     var configuration = sp.GetRequiredService<IConfiguration>();
-    var connectionString = configuration["MongoConnectionString"] ?? "mongodb://admin:1234@localhost:27018/";
+    var connectionString = configuration["mongoConnectionString"];
+
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        throw new InvalidOperationException("MongoConnectionString mangler. Tjek Vault-konfigurationen.");
+    }
+
     return new MongoClient(connectionString);
 });
 

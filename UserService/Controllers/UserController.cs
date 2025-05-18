@@ -52,7 +52,7 @@ public class UserController : ControllerBase
     }
 
     // POST: /User/AddUser
-    
+    [Authorize(Roles = "admin")]
     [HttpPost("AddUser")]
     public async Task<IActionResult> AddUser([FromBody] User newUser)
     {
@@ -63,6 +63,7 @@ public class UserController : ControllerBase
     }
 
     // PUT: /User/UpdateUser/{userId}
+    [Authorize(Roles = "admin")]
     [HttpPut("UpdateUser/{userId}")]
     public async Task<IActionResult> UpdateUser(Guid userId, [FromBody] User updatedUser)
     {
@@ -80,6 +81,7 @@ public class UserController : ControllerBase
     }
 
     // DELETE: /User/DeleteUser/{userId}
+    [Authorize(Roles = "admin")]
     [HttpDelete("DeleteUser/{userId}")]
     public async Task<IActionResult> DeleteUser(Guid userId)
     {

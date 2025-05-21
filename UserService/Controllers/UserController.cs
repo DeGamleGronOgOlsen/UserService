@@ -58,7 +58,6 @@ public class UserController : ControllerBase
     }
 
     // POST: /User/AddUser
-    [Authorize(Roles = "admin")]
     [HttpPost("AddUser")]
     public async Task<IActionResult> AddUser([FromBody] User newUser)
     {

@@ -1,82 +1,111 @@
-using Microsoft.OpenApi.Models;
-using NLog;
-using NLog.Web;
-using MongoDB.Driver;
-using Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using MongoDB.Driver;
+using NLog;
+using NLog.Web;
+using Services;
 using System.Text;
 using VaultSharp;
+using VaultSharp.V1.AuthMethods;
 using VaultSharp.V1.AuthMethods.Token;
 using VaultSharp.V1.Commons;
-using VaultSharp.V1.AuthMethods;
+
+// --- NLog: Setup NLog for early logging if needed ---
+var earlyLogger = NLog.LogManager.Setup().LoadConfigurationFromAppSettings().GetCurrentClassLogger();
+earlyLogger.Debug("UserService: Initializing Program.cs");
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Tilføjer logging
-var logger = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>().CreateLogger("VaultLogger");
+// --- Configure Logging (NLog integration) ---
+builder.Logging.ClearProviders();
+builder.Host.UseNLog();
 
-// Vault konfiguration
+// --- Vault Configuration & Secret Fetching ---
+var logger = builder.Services.BuildServiceProvider().GetRequiredService<ILogger<Program>>();
+logger.LogInformation("UserService: Attempting to configure Vault...");
+
+// Get Vault connection details from environment variables (set by docker-compose)
+string vaultAddress = builder.Configuration["Vault:Address"] ?? "https://vaulthost:8201";
+string vaultToken = builder.Configuration["Vault:Token"];
+
+if (string.IsNullOrEmpty(vaultToken))
+{
+    logger.LogError("UserService: Vault:Token is NOT configured in environment variables. Cannot authenticate with Vault. Ensure Vault__Token is set in docker-compose.yml.");
+    throw new InvalidOperationException("Vault token is not configured. Application cannot start.");
+}
+logger.LogInformation($"UserService: Using Vault Address: {vaultAddress}");
+logger.LogInformation("UserService: Using Vault Token (length): {VaultTokenLength}", vaultToken.Length);
+
+
 var httpClientHandler = new HttpClientHandler();
-// Get Vault address from configuration or use default
-string vaultAddress = builder.Configuration["Vault__Address"] ?? "https://vaulthost:8201/";
-logger.LogInformation($"Using Vault address: {vaultAddress}");
-
 httpClientHandler.ServerCertificateCustomValidationCallback =
-(message, cert, chain, sslPolicyErrors) => { return true; };
+    (message, cert, chain, sslPolicyErrors) =>
+    {
+        logger.LogWarning("UserService: Bypassing Vault SSL certificate validation. [Development ONLY]");
+        return true;
+    };
 
-// Konfigurer Vault klienten
-IAuthMethodInfo authMethod =
-new TokenAuthMethodInfo("00000000-0000-0000-0000-000000000000");
+IAuthMethodInfo authMethod = new TokenAuthMethodInfo(vaultToken);
 var vaultClientSettings = new VaultClientSettings(vaultAddress, authMethod)
 {
     Namespace = "",
-    MyHttpClientProviderFunc = handler
-    => new HttpClient(httpClientHandler)
-    {
-        BaseAddress = new Uri(vaultAddress)
-    }
+    MyHttpClientProviderFunc = handler => new HttpClient(httpClientHandler) { BaseAddress = new Uri(vaultAddress) }
 };
 IVaultClient vaultClient = new VaultClient(vaultClientSettings);
 
 try
 {
-    // Henter hemmeligheder fra Vault
-    logger.LogInformation("Henter hemmeligheder fra Vault...");
-    Secret<SecretData> secretData = await vaultClient.V1.Secrets.KeyValue.V2.ReadSecretAsync(path:"Secrets", mountPoint: "secret");
+    logger.LogInformation("UserService: Fetching JWT parameters from Vault path 'Secrets'...");
+    Secret<SecretData> jwtParamsSecret = await vaultClient.V1.Secrets.KeyValue.V2.ReadSecretAsync(
+        path: "Secrets",
+        mountPoint: "secret"
+    );
+    string? jwtSecretKey = jwtParamsSecret.Data.Data["Secret"]?.ToString();
+    string? jwtIssuer = jwtParamsSecret.Data.Data["Issuer"]?.ToString();
+    string? jwtAudience = jwtParamsSecret.Data.Data["Audience"]?.ToString();
 
-    logger.LogInformation("Henter MongoDB connection string fra Vault...");
-    Secret<SecretData> connectionSecrets = await vaultClient.V1.Secrets.KeyValue.V2.ReadSecretAsync(
-    path: "Connections", mountPoint: "secret");
+    if (string.IsNullOrEmpty(jwtSecretKey)) throw new InvalidOperationException("JWT Secret not found in Vault at secret/Secrets.");
+    if (string.IsNullOrEmpty(jwtIssuer)) throw new InvalidOperationException("JWT Issuer not found in Vault at secret/Secrets.");
+    if (string.IsNullOrEmpty(jwtAudience)) throw new InvalidOperationException("JWT Audience not found in Vault at secret/Secrets.");
 
-    string mySecretKey = secretData.Data.Data["Secret"]?.ToString();
-    if (string.IsNullOrEmpty(mySecretKey))
-    {
-        logger.LogError("Secret er ikke defineret i Vault.");
-        throw new ArgumentNullException(nameof(mySecretKey), "Secret er ikke defineret i Vault.");
-    }
+    builder.Configuration["JwtSettings:Secret"] = jwtSecretKey;
+    builder.Configuration["JwtSettings:Issuer"] = jwtIssuer;
+    builder.Configuration["JwtSettings:Audience"] = jwtAudience;
+    logger.LogInformation("UserService: JWT parameters loaded from Vault.");
 
-    string myIssuer = secretData.Data.Data["Issuer"]?.ToString();
-    if (string.IsNullOrEmpty(myIssuer))
-    {
-        logger.LogError("Issuer er ikke defineret i Vault.");
-        throw new ArgumentNullException(nameof(myIssuer), "Issuer er ikke defineret i Vault.");
-    }
+    logger.LogInformation("UserService: Fetching Connection parameters from Vault path 'Connections'...");
+    Secret<SecretData> connectionParamsSecret = await vaultClient.V1.Secrets.KeyValue.V2.ReadSecretAsync(
+        path: "Connections",
+        mountPoint: "secret"
+    );
+    string? mongoConnectionString = connectionParamsSecret.Data.Data["mongoConnectionString"]?.ToString();
+    string? mongoDbName = connectionParamsSecret.Data.Data["MongoDbDatabaseName"]?.ToString();
+    string? authServiceUrl = connectionParamsSecret.Data.Data["AuthServiceUrl"]?.ToString();
 
-    string mongoConnectionString = connectionSecrets.Data.Data["mongoConnectionString"]?.ToString();
-    if (string.IsNullOrEmpty(mongoConnectionString))
-    {
-    logger.LogError("MongoConnectionString er ikke defineret i Vault.");
-    throw new ArgumentNullException(nameof(mongoConnectionString), "MongoConnectionString er ikke defineret i Vault.");
-    }
+    if (string.IsNullOrEmpty(mongoConnectionString)) throw new InvalidOperationException("mongoConnectionString not found in Vault at secret/Connections.");
+    if (string.IsNullOrEmpty(mongoDbName)) throw new InvalidOperationException("MongoDbDatabaseName not found in Vault at secret/Connections.");
+    if (string.IsNullOrEmpty(authServiceUrl)) throw new InvalidOperationException("AuthServiceUrl not found in Vault at secret/Connections.");
 
-    builder.Configuration["mongoConnectionString"] = mongoConnectionString;
-    builder.Configuration["Secret"] = mySecretKey;
-    builder.Configuration["Issuer"] = myIssuer;
+    builder.Configuration["MongoDb:ConnectionString"] = mongoConnectionString;
+    builder.Configuration["MongoDb:DatabaseName"] = mongoDbName;
+    builder.Configuration["AuthServiceUrl"] = authServiceUrl;
+    logger.LogInformation("UserService: Connection parameters (MongoDB, AuthServiceUrl) loaded from Vault.");
 
-    // Konfigurer JWT autentificering
-    builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+}
+catch (Exception ex)
+{
+    logger.LogCritical(ex, "UserService: CRITICAL ERROR fetching secrets from Vault. Application cannot start properly.");
+    throw;
+}
+
+
+// --- Add services to the container ---
+builder.Services.AddRazorPages();
+builder.Services.AddControllers();
+
+// Configure JWT Authentication (UserService validates tokens issued by AuthService)
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters()
@@ -85,77 +114,101 @@ try
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = myIssuer,
-            ValidAudience = "http://localhost",
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(mySecretKey))
+            ValidIssuer = builder.Configuration["JwtSettings:Issuer"],
+            ValidAudience = builder.Configuration["JwtSettings:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Secret"])) // Read from config
         };
     });
-}
-catch (Exception ex)
-{
-    logger.LogError($"Fejl under hentning af hemmeligheder fra Vault: {ex.Message}");
-    throw;
-}
+logger.LogInformation("UserService: JWT Authentication services configured.");
 
-// Add services to the container.
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddAuthorization();
+
+// MongoDB Configuration
+builder.Services.AddSingleton<IMongoClient>(sp =>
+{
+    var configuration = sp.GetRequiredService<IConfiguration>();
+    var connectionString = configuration["MongoDb:ConnectionString"]; 
+    var dbName = configuration["MongoDb:DatabaseName"]; 
+
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        logger.LogCritical("UserService: MongoDb:ConnectionString is missing from configuration after Vault fetch. Application cannot connect to DB.");
+        throw new InvalidOperationException("MongoDb:ConnectionString is missing. Check Vault configuration at secret/Connections.");
+    }
+    logger.LogInformation($"UserService: Configuring IMongoClient for database: {dbName} (ConnectionString retrieved).");
+    return new MongoClient(connectionString);
+});
+builder.Services.AddScoped<IUserDBRepository, UserMongoDBService>();
+
+// HttpClient for the Login PageModel within UserService to call AuthService
+builder.Services.AddHttpClient("AuthApiClient", (serviceProvider, client) =>
+{
+    var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+    var authUrl = configuration["AuthServiceUrl"]; 
+
+    if (!string.IsNullOrEmpty(authUrl))
+    {
+        client.BaseAddress = new Uri(authUrl);
+        logger.LogInformation($"UserService: AuthApiClient BaseAddress set to: {authUrl}");
+    }
+    else
+    {
+        logger.LogCritical("UserService: AuthServiceUrl for AuthApiClient NOT FOUND in IConfiguration. Login page will fail. Check Vault at secret/Connections for key 'AuthServiceUrl'.");
+        throw new InvalidOperationException("AuthServiceUrl for AuthApiClient is not configured. Check Vault.");
+    }
+});
+
+// Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "UserService API & UI", Version = "v1" });
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Version = "v1",
-        Title = "UserAPI API",
-        Description = "An ASP.NET Core Web API for managing ToDo items",
-        TermsOfService = new Uri("https://example.com/terms"),
-        Contact = new OpenApiContact
+        In = ParameterLocation.Header,
+        Description = "Please enter JWT",
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        BearerFormat = "JWT",
+        Scheme = "Bearer"
+    });
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
         {
-            Name = "Example Contact",
-            Url = new Uri("https://example.com/contact")
-        },
-        License = new OpenApiLicense
-        {
-            Name = "Example License",
-            Url = new Uri("https://example.com/license")
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+            },
+            Array.Empty<string>()
         }
     });
 });
 
-builder.Services.AddAuthorization();
-builder.Services.AddScoped<IUserDBRepository, UserMongoDBService>();
-builder.Services.AddSingleton<IMongoClient>(sp =>
-{
-    var configuration = sp.GetRequiredService<IConfiguration>();
-    var connectionString = configuration["mongoConnectionString"];
-
-    if (string.IsNullOrWhiteSpace(connectionString))
-    {
-        throw new InvalidOperationException("MongoConnectionString mangler. Tjek Vault-konfigurationen.");
-    }
-
-    return new MongoClient(connectionString);
-});
-
-builder.Services.AddHttpClient();
-builder.Logging.ClearProviders();
-builder.Host.UseNLog();
-
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// --- Configure the HTTP request pipeline ---
 if (app.Environment.IsDevelopment())
 {
+    app.UseDeveloperExceptionPage();
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "UserService API & UI v1"));
+}
+else
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 
-// These middleware calls are required for JWT authentication to work
+app.UseRouting();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapRazorPages();
 app.MapControllers();
 
+logger.LogInformation("UserService: Application starting...");
 app.Run();

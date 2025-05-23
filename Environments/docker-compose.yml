@@ -1,8 +1,19 @@
 services:
+  web_frontend:
+    image: nginx:alpine
+    ports:
+      - "8081:80"
+    volumes:
+      - ../UserService/Pages:/usr/share/nginx/html
+    networks:
+      - shared-network
+
   user_service:
+    container_name: user_service
     build:
       context: ../UserService
       dockerfile: Dockerfile
+    restart: on-failure:10
     ports:
       - "8080:8080"
     environment:
@@ -12,10 +23,12 @@ services:
       Vault__Token: "00000000-0000-0000-0000-000000000000"
     depends_on:
       - vault-init
+      - auth_service
     networks:
       - shared-network
 
   auth_service:
+    container_name: auth_service
     build:
       context: ../../AuthService/AuthService
       dockerfile: Dockerfile
@@ -30,7 +43,6 @@ services:
       UserServiceUrl: "http://user_service:8080"
     depends_on:
       - vault-init
-      - user_service
     networks:
       - shared-network
 
@@ -58,6 +70,7 @@ services:
     command: server -dev -dev-root-token-id="00000000-0000-0000-0000-000000000000"
 
   vault-init:
+    container_name: vault-init
     image: hashicorp/vault:latest
     command: sh "/app/vault_init.sh"
     depends_on:
@@ -70,6 +83,7 @@ services:
       - shared-network
 
   mongodb:
+    container_name: UserDatabase
     image: mongo:latest
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin

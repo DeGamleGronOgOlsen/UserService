@@ -104,6 +104,18 @@ catch (Exception ex)
 builder.Services.AddRazorPages();
 builder.Services.AddControllers();
 
+// Configure CORS policy to allow your frontend
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowCors", policy =>
+    {
+        policy.WithOrigins("http://localhost:8081", "http://localhost:8080", "https://localhost:8081", "http://localhost:4000", "http://localhost:5162", "http://localhost:8201") // Added 8081 first
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
 // Configure JWT Authentication (UserService validates tokens issued by AuthService)
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -185,6 +197,8 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+app.UseCors("AllowCors");
 
 // --- Configure the HTTP request pipeline ---
 if (app.Environment.IsDevelopment())

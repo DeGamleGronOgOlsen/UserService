@@ -129,7 +129,10 @@ public class UserController : ControllerBase
             return Unauthorized(new { message = "Invalid username or password" });
         }
 
-        _logger.LogInformation("User validated successfully: {Username}", login.Username);
-        return Ok(new { Role = validUser.Role });
+        _logger.LogInformation("User validated successfully: {Username} with ID: {UserId}", login.Username, validUser.Id);
+        return Ok(new { 
+            Role = validUser.Role,
+            UserId = validUser.Id.ToString()
+        });
     }    
 }

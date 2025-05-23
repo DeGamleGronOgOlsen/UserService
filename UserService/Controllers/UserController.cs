@@ -3,6 +3,7 @@ using Services;
 using System.Linq;
 using System.Diagnostics;
 using UserService.Models;
+using Microsoft.AspNetCore.Authorization;
 
 
 namespace UserService.Controllers;
@@ -41,6 +42,7 @@ public class UserController : ControllerBase
     }
 
     // GET: /User/GetAllUsers
+    [Authorize(Roles = "admin")]
     [HttpGet("GetAllUsers")]
     public async Task<ActionResult<IEnumerable<User>>> GetAll()
     {
@@ -50,6 +52,7 @@ public class UserController : ControllerBase
     }
 
     // POST: /User/AddUser
+    [Authorize(Roles = "admin")]
     [HttpPost("AddUser")]
     public async Task<IActionResult> AddUser([FromBody] User newUser)
     {
@@ -60,6 +63,7 @@ public class UserController : ControllerBase
     }
 
     // PUT: /User/UpdateUser/{userId}
+    [Authorize(Roles = "admin")]
     [HttpPut("UpdateUser/{userId}")]
     public async Task<IActionResult> UpdateUser(Guid userId, [FromBody] User updatedUser)
     {
@@ -77,6 +81,7 @@ public class UserController : ControllerBase
     }
 
     // DELETE: /User/DeleteUser/{userId}
+    [Authorize(Roles = "admin")]
     [HttpDelete("DeleteUser/{userId}")]
     public async Task<IActionResult> DeleteUser(Guid userId)
     {

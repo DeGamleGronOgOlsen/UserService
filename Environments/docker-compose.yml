@@ -7,6 +7,12 @@ services:
       - "8080:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      Vault__Address: "https://vaulthost:8201"
+    depends_on:
+    - vault-init
+    - vaulthost
+    healthcheck:
+      retries: 5
     networks:
       - shared-network
 
@@ -22,7 +28,8 @@ services:
       Vault__Address: "https://vaulthost:8201"
       UserServiceUrl: "http://user_service:8080" # Brug UserService's containernavn og port
     depends_on:
-      - vaulthost
+      - vault-init
+      - user_service
     healthcheck:
       retries: 5
     networks:

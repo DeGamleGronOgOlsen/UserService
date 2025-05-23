@@ -1,0 +1,240 @@
+﻿@page "/login"
+@model YourWebApp.Pages.Account.LoginModel
+@{
+    ViewData["Title"] = "Login";
+}
+
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewData["Title"] - Auktionshuset Grøn og Olsen</title>
+
+    <style>
+        :root {
+            --primary-color: #0f233f;
+            --gold-color: #a68e34;
+            --light-bg: #f9f5ef;
+            --dark-text: #333;
+            --light-text: #fff;
+            --error-color: #d9534f;
+        }
+
+        body.login-page-body {
+            background-color: var(--light-bg);
+            color: var(--dark-text);
+            font-family: 'Georgia', serif;
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .login-page-header {
+            background-color: var(--primary-color);
+            padding: 1rem 0;
+            text-align: center;
+        }
+
+            .login-page-header .logo-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .login-page-header .company-logo-img {
+                width: 220px;
+                max-width: 75%;
+                height: auto;
+                margin-bottom: 0.5rem;
+            }
+
+            .login-page-header .back-to-home-link {
+                color: var(--gold-color);
+                text-decoration: none;
+                margin-top: 0.75rem;
+                display: inline-block;
+                font-size: 0.9rem;
+            }
+
+                .login-page-header .back-to-home-link:hover {
+                    text-decoration: underline;
+                }
+
+        .login-page-main {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 3rem 1rem;
+        }
+
+        .login-container {
+            max-width: 420px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2.5rem;
+            background-color: #fff;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            border-top: 5px solid var(--gold-color);
+            border-radius: 8px;
+        }
+
+            .login-container h1 {
+                color: var(--primary-color);
+                text-align: center;
+                margin-bottom: 2rem;
+                font-size: 2rem;
+            }
+
+        .form-group {
+            margin-bottom: 1.75rem;
+        }
+
+            .form-group label {
+                display: block;
+                margin-bottom: 0.6rem;
+                font-weight: bold;
+                color: var(--dark-text);
+            }
+
+        .form-control {
+            width: 100%;
+            padding: 0.9rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+
+            .form-control:focus {
+                border-color: var(--gold-color);
+                box-shadow: 0 0 0 0.2rem rgba(166, 142, 52, 0.25);
+                outline: none;
+            }
+
+        .btn-login-submit {
+            display: block;
+            width: 100%;
+            background-color: var(--gold-color);
+            color: var(--light-text);
+            padding: 0.9rem 1.5rem;
+            text-decoration: none;
+            font-weight: bold;
+            text-transform: uppercase;
+            border: 2px solid var(--gold-color);
+            border-radius: 4px;
+            transition: all 0.3s ease-in-out;
+            cursor: pointer;
+            font-size: 1.1rem;
+            text-align: center;
+        }
+
+            .btn-login-submit:hover {
+                background-color: var(--primary-color);
+                color: var(--gold-color);
+                border-color: var(--primary-color);
+            }
+
+        .text-danger {
+            color: var(--error-color);
+            font-size: 0.85em;
+            display: block;
+            margin-top: 0.3rem;
+        }
+
+        .server-error-message {
+            color: var(--error-color);
+            background-color: #ffebee;
+            border: 1px solid var(--error-color);
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .login-page-footer {
+            background-color: var(--primary-color);
+            color: var(--light-text);
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: auto;
+        }
+    </style>
+</head>
+<body class="login-page-body">
+    <header class="login-page-header">
+        <div class="logo-container">
+            <div style="width: 220px; height: 80px; background-color: var(--gold-color); display: flex; justify-content: center; align-items: center; color: var(--light-text); font-weight: bold;">
+                Grøn og Olsen Logo
+            </div>
+            <a href="/" class="back-to-home-link">Tilbage til forsiden</a>
+        </div>
+    </header>
+
+    <main class="login-page-main">
+        <div class="login-container">
+            <h1>Login</h1>
+
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+            {
+                <div class="server-error-message" role="alert">@Model.ErrorMessage</div>
+            }
+
+            <form method="post">
+                @Html.AntiForgeryToken()
+                <div class="form-group">
+                    <label for="Username">Brugernavn</label>
+                    <input type="text" id="Username" name="Input.Username" class="form-control" value="@Model.Input.Username" autocomplete="username" />
+                    <span class="text-danger">@Html.ValidationMessageFor(m => m.Input.Username)</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="Password">Adgangskode</label>
+                    <input type="password" id="Password" name="Input.Password" class="form-control" autocomplete="current-password" />
+                    <span class="text-danger">@Html.ValidationMessageFor(m => m.Input.Password)</span>
+                </div>
+
+                <div class="form-group" style="margin-top: 2rem;">
+                    <button type="submit" class="btn-login-submit">Login</button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <footer class="login-page-footer">
+        <p>&copy; @DateTime.Now.Year Auktionshuset Grøn og Olsen - Alle rettigheder forbeholdes</p>
+    </footer>
+
+    @if (Model.LoginSuccess && !string.IsNullOrEmpty(Model.JwtTokenForClient))
+    {
+        <script type="text/javascript">
+            try {
+                console.log("CLIENT SCRIPT: Login was successful. Storing token and username.");
+
+                // Safely encode the token and username for embedding in JavaScript
+                var tokenToStore = '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(Model.JwtTokenForClient))';
+                var usernameToStore = '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(Model.UsernameForClient ?? ""))';
+
+                localStorage.setItem('jwtToken', tokenToStore);
+                localStorage.setItem('isLoggedIn', 'true');
+
+                if (usernameToStore) {
+                    localStorage.setItem('username', usernameToStore);
+                    console.log("CLIENT SCRIPT: Username stored: " + usernameToStore);
+                }
+
+                console.log("CLIENT SCRIPT: Token and user info stored. Showing success alert.");
+                alert('Login successful!');
+
+            } catch (e) {
+                console.error("CLIENT SCRIPT: Error storing token/username in localStorage or showing alert:", e);
+                alert('En fejl opstod på klientsiden efter login.');
+            }
+        </script>
+    }
+</body>
+</html>

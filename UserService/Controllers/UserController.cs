@@ -48,17 +48,28 @@ public class UserController : ControllerBase
     {
         _logger.LogInformation("Getting all users");
         var users = await _userRepository.GetAllUsersAsync();
+        // Check if the list is empty
+        if (users == null || !users.Any())
+        {
+            _logger.LogWarning("No users found");
+            return NotFound(new { message = "No users found" });
+        }
         return Ok(users);
     }
 
     // POST: /User/AddUser
-    [Authorize(Roles = "admin")]
     [HttpPost("AddUser")]
     public async Task<IActionResult> AddUser([FromBody] User newUser)
     {
         newUser.Id = Guid.NewGuid(); 
         var createdUser = await _userRepository.CreateUserAsync(newUser);
         _logger.LogInformation("Added new user with ID: {UserId}", createdUser.Id);
+        // Check if the user was created successfully
+        if (createdUser == null)
+        {
+            _logger.LogError("Failed to create user");
+            return StatusCode(500, "Failed to create user");
+        }
         return CreatedAtRoute("GetUserById", new { userId = createdUser.Id }, createdUser);
     }
 
@@ -104,23 +115,21 @@ public class UserController : ControllerBase
     }
 
     [HttpPost("validate")]
-public async Task<IActionResult> ValidateUser([FromBody] LoginModel login)
-{
-    _logger.LogInformation("Validating user with username: {Username}", login.Username);
-
-    // Find brugeren baseret på brugernavn og adgangskode
-    var user = await _userRepository.GetAllUsersAsync();
-    var validUser = user.FirstOrDefault(u => u.Username == login.Username && u.Password == login.Password);
-
-    if (validUser == null)
+    public async Task<IActionResult> ValidateUser([FromBody] LoginModel login)
     {
-        _logger.LogWarning("Invalid username or password for username: {Username}", login.Username);
-        return Unauthorized(new { message = "Invalid username or password" });
-    }
+        _logger.LogInformation("Validating user with username: {Username}", login.Username);
 
-    _logger.LogInformation("User validated successfully: {Username}", login.Username);
-    return Ok(new { Role = validUser.Role });
-}
+        // Find brugeren baseret på brugernavn og adgangskode
+        var user = await _userRepository.GetAllUsersAsync();
+        var validUser = user.FirstOrDefault(u => u.Username == login.Username && u.Password == login.Password);
 
-    
+        if (validUser == null)
+        {
+            _logger.LogWarning("Invalid username or password for username: {Username}", login.Username);
+            return Unauthorized(new { message = "Invalid username or password" });
+        }
+
+        _logger.LogInformation("User validated successfully: {Username}", login.Username);
+        return Ok(new { Role = validUser.Role });
+    }    
 }

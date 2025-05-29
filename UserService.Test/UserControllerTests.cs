@@ -31,7 +31,7 @@ namespace UserService.Test.Controllers
             {
                 Username = "testuser",
                 Password = "testpass",
-                Role = Role.User  // Changed from string to enum
+                Role = "User"  // Changed from enum to string
             };
 
             _mockRepository.Setup(r => r.CreateUserAsync(It.IsAny<User>()))
@@ -62,7 +62,7 @@ namespace UserService.Test.Controllers
                 { 
                     Username = "testuser",
                     Password = "testpass",
-                    Role = Role.Admin
+                    Role = "Admin"  // Changed from enum to string
                 }
             };
 
@@ -78,8 +78,8 @@ namespace UserService.Test.Controllers
             Assert.That(result.Value, Is.Not.Null);
 
             // Create a type to match the anonymous type returned by the controller
-            var response = result.Value.GetType().GetProperty("Role").GetValue(result.Value);
-            Assert.That(response.ToString(), Is.EqualTo(Role.Admin.ToString()));
+            var response = result.Value?.GetType().GetProperty("Role")?.GetValue(result.Value);
+            Assert.That(response?.ToString(), Is.EqualTo("Admin"));
         }
 
         [Test]

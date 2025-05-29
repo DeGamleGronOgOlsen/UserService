@@ -27,8 +27,8 @@ public class UserController : ControllerBase
         _logger.LogInformation(1, $"UserService responding from {_ipaddr}");
     }
 
-    // GET: /User/{userId}
-    [HttpGet("{userId}", Name = "GetUserById")]
+    // GET: /User/details/{userId}
+    [HttpGet("details/{userId}", Name = "GetUserById")]
     public async Task<ActionResult<User>> Get(Guid userId)
     {
         _logger.LogInformation("Getting user with ID: {UserId}", userId);
@@ -57,8 +57,8 @@ public class UserController : ControllerBase
         return Ok(users);
     }
 
-    // POST: /User/AddUser
-    [HttpPost("AddUser")]
+    // POST: /User/add
+    [HttpPost("add")]
     public async Task<IActionResult> AddUser([FromBody] User newUser)
     {
         newUser.Id = Guid.NewGuid(); 
@@ -73,9 +73,9 @@ public class UserController : ControllerBase
         return CreatedAtRoute("GetUserById", new { userId = createdUser.Id }, createdUser);
     }
 
-    // PUT: /User/UpdateUser/{userId}
+    // PUT: /User/update/{userId}
     [Authorize(Roles = "admin")]
-    [HttpPut("UpdateUser/{userId}")]
+    [HttpPut("update/{userId}")]
     public async Task<IActionResult> UpdateUser(Guid userId, [FromBody] User updatedUser)
     {
         var existingUser = await _userRepository.GetUserByIdAsync(userId);
@@ -91,9 +91,9 @@ public class UserController : ControllerBase
         return Ok(updated);
     }
 
-    // DELETE: /User/DeleteUser/{userId}
+    // DELETE: /User/delete/{userId}
     [Authorize(Roles = "admin")]
-    [HttpDelete("DeleteUser/{userId}")]
+    [HttpDelete("delete/{userId}")]
     public async Task<IActionResult> DeleteUser(Guid userId)
     {
         var existingUser = await _userRepository.GetUserByIdAsync(userId);
